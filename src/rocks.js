@@ -30,6 +30,7 @@ export class Rock {
     this.y = p.y;
     this.state = 'idle'; // idle | wobble | falling | broken
     this.wobbleT = 0;
+    this.held = false; // player is propping it up from directly below
     this.landRow = r;
     this.crushed = new Set(); // entity refs crushed during the current fall
     this.shardT = 0;
@@ -55,9 +56,29 @@ export class RockField {
     return s;
   }
 
-  // crushables: array of {x, y, alive} (player + enemies). Returns event list:
+  // Cells of all resting rocks — passed to the player's movement so a suspended
+  // rock blocks entry (the player props it up by pushing into it from below).
+  restingCells() {
+    const s = new Set();
+    for (const rk of this.rocks) {
+      if (rk.resting()) s.add(key(rk.c, rk.r));
+    }
+    return s;
+  }
+
+  // A rock is "held" when the player is in the cell directly below it AND is
+  // actively digging upward — propping it up so the fall timer can't start.
+  _isHeld(rk, player, diggingUp) {
+    if (!diggingUp || !player || player.alive === false) return false;
+    const pc = Math.floor(player.x / TILE);
+    const pr = Math.floor(player.y / TILE);
+    return pc === rk.c && pr === rk.r + 1;
+  }
+
+  // crushables: array of {x, y, alive} (player + enemies). player + playerDiggingUp
+  // drive the "hold the rock up" mechanic. Returns event list:
   //   {type:'start', rock} | {type:'crush', rock, entity, chainIndex} | {type:'land', rock}
-  update(dt, grid, crushables) {
+  update(dt, grid, crushables, player = null, playerDiggingUp = false) {
     const events = [];
 
     for (const rk of this.rocks) {
@@ -67,28 +88,30 @@ export class RockField {
         continue;
       }
 
-      if (rk.state === 'idle') {
-        const occ = this.occupiedSet(rk);
-        if (!isSupported(grid, rk.c, rk.r, occ)) {
-          rk.state = 'wobble';
-          rk.wobbleT = 0;
-        }
-        continue;
-      }
-
-      if (rk.state === 'wobble') {
-        // If something re-supports it (rare), settle again.
+      if (rk.state === 'idle' || rk.state === 'wobble') {
         const occ = this.occupiedSet(rk);
         if (isSupported(grid, rk.c, rk.r, occ)) {
+          // Settled (or re-supported): reset.
           rk.state = 'idle';
+          rk.wobbleT = 0;
+          rk.held = false;
           continue;
         }
-        rk.wobbleT += dt;
-        if (rk.wobbleT >= ROCK_WOBBLE_SEC) {
-          rk.state = 'falling';
-          rk.landRow = fallTargetRow(grid, rk.c, rk.r, occ);
-          rk.crushed.clear();
-          events.push({ type: 'start', rock: rk });
+
+        // Unsupported. If the player is propping it up, freeze the countdown;
+        // the fall timer only runs once they stop digging up / move away.
+        rk.held = this._isHeld(rk, player, playerDiggingUp);
+        if (rk.state === 'idle') rk.state = 'wobble';
+        if (rk.held) {
+          rk.wobbleT = 0;
+        } else {
+          rk.wobbleT += dt;
+          if (rk.wobbleT >= ROCK_WOBBLE_SEC) {
+            rk.state = 'falling';
+            rk.landRow = fallTargetRow(grid, rk.c, rk.r, occ);
+            rk.crushed.clear();
+            events.push({ type: 'start', rock: rk });
+          }
         }
         continue;
       }

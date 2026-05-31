@@ -51,11 +51,13 @@ export class Pump {
     if (this.active && this.hooked) this._inflate(grid, events);
   }
 
-  // Release (player moved or let go with no hook): retract + free the enemy.
+  // Release (player moved or let go): retract the harpoon. A hooked enemy is NOT
+  // reset — it keeps its current inflation and stays frozen, then deflates on its
+  // own (enemies.js) over a few seconds before resuming.
   cancel() {
     if (this.hooked && this.hooked.state === 'hooked') {
-      this.hooked.state = 'normal';
-      this.hooked.inflate = 0;
+      this.hooked.state = 'normal'; // inflate>0 keeps it frozen via enemy.update
+      this.hooked.deflateT = 0; // start the release-deflation countdown
     }
     this.active = false;
     this.hooked = null;
@@ -65,6 +67,7 @@ export class Pump {
   _inflate(grid, events) {
     const e = this.hooked;
     e.inflate += 1;
+    e.deflateT = 0; // fresh pump resets the release countdown
     this.sincePump = 0;
     this.autoT = 0;
     events.push({ type: 'inflate', enemy: e });
@@ -110,6 +113,7 @@ export class Pump {
         this.hooked = e;
         e.state = 'hooked';
         e.inflate = Math.max(1, e.inflate);
+        e.deflateT = 0;
         this.sincePump = 0;
         this.autoT = 0;
         events.push({ type: 'hook', enemy: e });

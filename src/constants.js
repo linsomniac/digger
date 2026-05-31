@@ -28,7 +28,8 @@ export const ROCK_FALL_SPEED = 250;
 // Pump / inflation
 export const PUMP_REACH = TILE * 1.5; // 48 px harpoon reach
 export const MAX_INFLATE = 4; // pops when inflate level reaches this
-export const INFLATE_DEFLATE_SEC = 0.7; // seconds to lose one stage when not pumping
+export const INFLATE_DEFLATE_SEC = 0.7; // seconds to lose one stage while still hooked but not pumping
+export const INFLATE_RELEASE_SEC = 1.7; // seconds per stage to deflate after the player runs away (~5s from a 3-pump)
 export const PUMP_EXTEND_SEC = 0.1; // harpoon extend animation duration
 export const PUMP_INFLATE_COOLDOWN = 0.14; // min seconds between inflate presses registering
 

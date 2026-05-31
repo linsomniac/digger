@@ -18,7 +18,10 @@ export function atCellCenter(ent) {
 }
 
 // Moves ent toward `dir` by speed*dt. Returns [c,r] cells freshly dug (dig=true only).
-export function stepEntity(ent, dt, grid, dir, speed, dig) {
+// blockedCells: optional Set of "c,r" keys the entity may not enter (e.g. resting
+// rocks). A blocked cell stops movement and is NOT dug — this is how the player
+// "holds up" a rock by pushing into it from below.
+export function stepEntity(ent, dt, grid, dir, speed, dig, blockedCells = null) {
   const dug = [];
   if (!dir || dir === Dir.NONE) {
     ent.dir = Dir.NONE;
@@ -47,8 +50,9 @@ export function stepEntity(ent, dt, grid, dir, speed, dig) {
 
     const cell = pxToTile(ent.x, ent.y);
     const ahead = { c: cell.c + dx, r: cell.r + dy };
+    const rockBlocked = blockedCells !== null && blockedCells.has(`${ahead.c},${ahead.r}`);
     const blocked =
-      !grid.inBounds(ahead.c, ahead.r) || (!dig && grid.isSolid(ahead.c, ahead.r));
+      !grid.inBounds(ahead.c, ahead.r) || (!dig && grid.isSolid(ahead.c, ahead.r)) || rockBlocked;
     if (blocked) {
       ent.x = nearestColCenter(ent.x);
       ent.y = nearestRowCenter(ent.y);

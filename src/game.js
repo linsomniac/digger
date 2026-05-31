@@ -182,9 +182,14 @@ export class Game {
       else this.pump.pumpPress(this.grid, events);
     }
 
+    // Resting rocks block the player's movement (you can push up under one to
+    // hold it). diggingUp tells the rock field to keep that rock propped.
+    const restingRocks = this.rocks.restingCells();
+    const diggingUp = wantMove && moveDir === Dir.UP;
+
     if (wantMove) {
       if (this.pump.active) this.pump.cancel();
-      this.player.move(dt, this.grid, moveDir, events);
+      this.player.move(dt, this.grid, moveDir, events, restingRocks);
       this.audio.setMoving(true);
     } else {
       this.player.idle(dt);
@@ -195,7 +200,7 @@ export class Game {
     this.enemies.update(dt, this.grid, this.player, this.level, this.rng, events);
 
     const crushables = [this.player, ...this.enemies.enemies.filter((e) => e.state !== 'dead')];
-    for (const ev of this.rocks.update(dt, this.grid, crushables)) events.push(ev);
+    for (const ev of this.rocks.update(dt, this.grid, crushables, this.player, diggingUp)) events.push(ev);
 
     if (this.veggie) this.veggie.update(dt);
 

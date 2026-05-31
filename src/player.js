@@ -27,9 +27,10 @@ export class Player {
   }
 
   // dir: desired direction this frame (Dir.NONE = stand still). Returns dig events.
-  move(dt, grid, dir, events) {
+  // blockedCells: cells the player cannot enter (resting rocks).
+  move(dt, grid, dir, events, blockedCells = null) {
     if (this.invuln > 0) this.invuln = Math.max(0, this.invuln - dt);
-    const dug = stepEntity(this, dt, grid, dir, PLAYER_SPEED, true);
+    const dug = stepEntity(this, dt, grid, dir, PLAYER_SPEED, true, blockedCells);
     if (this.dir !== Dir.NONE) this.walkPhase += dt * 10;
     for (const cell of dug) events.push({ type: 'dig', cell });
     return dug;

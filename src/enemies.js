@@ -1,6 +1,8 @@
 // AIDEV-NOTE: Pooka + Fygar. Tunnel-chase via ai.chooseTunnelDir, periodic ghost
 // mode (drift through soil), Fygar horizontal fire, and last-enemy flee. Frozen
-// while hooked/inflated (pump.js drives that). Ghosts are non-lethal (fair).
+// while hooked (pump.js drives that). After the player runs away, a still-inflated
+// enemy stays frozen and slowly deflates back to normal over a few seconds, then
+// resumes. Ghosts and inflated enemies are non-lethal (fair).
 import {
   Dir,
   TILE,
@@ -10,6 +12,7 @@ import {
   FIRE_TELEGRAPH_SEC,
   FIRE_DURATION_SEC,
   FIRE_RANGE_TILES,
+  INFLATE_RELEASE_SEC,
 } from './constants.js';
 import { pxToTile, tileToPx, nearestColCenter, nearestRowCenter } from './grid.js';
 import { chooseTunnelDir, ghostStep, shouldGhost } from './ai.js';
@@ -31,6 +34,7 @@ export class Enemy {
     this.speed = speed;
     this.state = 'normal'; // normal | ghost | hooked | fleeing | dead
     this.inflate = 0;
+    this.deflateT = 0; // release-deflation timer (after the player runs away)
     this.escaped = false;
     this.ghostTimer = ghostPhase;
     this.ghostElapsed = 0;
@@ -50,6 +54,7 @@ export class Enemy {
     this.facing = Dir.LEFT;
     this.state = 'normal';
     this.inflate = 0;
+    this.deflateT = 0;
     this.escaped = false;
     this.ghostElapsed = 0;
     this.fireState = 'none';
@@ -57,8 +62,11 @@ export class Enemy {
     this.fireLen = 0;
   }
 
-  // Lethal to the player only when solid and present.
+  // Lethal to the player only when solid, present, and not inflated. An inflated
+  // (caught / deflating) enemy is harmless to touch — so releasing one next to
+  // you doesn't kill you, and you can safely run past it while it deflates.
   lethal() {
+    if (this.inflate > 0) return false;
     return this.state === 'normal' || this.state === 'fleeing';
   }
 
@@ -100,8 +108,19 @@ export class Enemy {
     if (this.state === 'dead') return;
     this.anim += dt;
 
-    // Frozen while caught.
-    if (this.state === 'hooked' || this.inflate > 0) return;
+    // Frozen while hooked — pump.js owns inflation + position.
+    if (this.state === 'hooked') return;
+
+    // Released but still inflated: stay frozen in place and slowly deflate one
+    // stage at a time. Once fully deflated it resumes normal behavior.
+    if (this.inflate > 0) {
+      this.deflateT += dt;
+      if (this.deflateT >= INFLATE_RELEASE_SEC) {
+        this.deflateT = 0;
+        this.inflate = Math.max(0, this.inflate - 1);
+      }
+      return;
+    }
 
     if (this.type === 'fygar') this.fireTimer += dt;
 
@@ -192,7 +211,7 @@ export class EnemyField {
       this.aloneT += dt;
       if (this.aloneT > FLEE_AFTER_SEC) {
         const last = this.enemies.find((e) => e.state !== 'dead');
-        if (last && last.state === 'normal') last.state = 'fleeing';
+        if (last && last.state === 'normal' && last.inflate === 0) last.state = 'fleeing';
       }
     } else {
       this.aloneT = 0;
