@@ -11,6 +11,7 @@ import { EnemyField } from './enemies.js';
 import { RockField } from './rocks.js';
 import { Veggie, shouldSpawnVeggie } from './veggie.js';
 import { Particles } from './particles.js';
+import { Floaters } from './floaters.js';
 import { getLevel } from './levels.js';
 import { pookaScore, fygarScore, rockChainScore, extraLifeCount } from './scoring.js';
 import { getHighScore, setHighScore, setMuted } from './storage.js';
@@ -29,6 +30,7 @@ export class Game {
     this.rocks = new RockField([]);
     this.veggie = null;
     this.particles = new Particles();
+    this.floaters = new Floaters();
     this.level = getLevel(1);
     this.score = 0;
     this.highScore = getHighScore();
@@ -70,6 +72,7 @@ export class Game {
     this.veggieSpawned = false;
     this.pump.reset();
     this.particles = new Particles();
+    this.floaters = new Floaters();
     this.setState('ready');
   }
 
@@ -169,6 +172,7 @@ export class Game {
     }
 
     this.particles.update(dt);
+    this.floaters.update(dt);
   }
 
   updatePlaying(dt, input) {
@@ -213,6 +217,7 @@ export class Game {
         this.addScore(this.veggie.value);
         this.audio.sfx('veggie');
         this.particles.sparkle(this.veggie.x, this.veggie.y);
+        this.floaters.add(this.veggie.x, this.veggie.y, this.veggie.value, '#ffe066');
         this.veggie.alive = false;
       }
     }
@@ -240,6 +245,7 @@ export class Game {
           this.addScore(sc);
           this.audio.sfx('pop');
           this.particles.burst(e.x, e.y, e.type === 'fygar' ? '#9fe87a' : '#ffb0a0', 16, 110);
+          this.floaters.add(e.x, e.y, sc);
           this.shake = 4;
           break;
         }
@@ -251,10 +257,12 @@ export class Game {
           if (ent === this.player) {
             this.killPlayer();
           } else if (ent.state !== 'dead') {
-            this.addScore(rockChainScore(ev.chainIndex));
+            const sc = rockChainScore(ev.chainIndex);
+            this.addScore(sc);
             ent.state = 'dead';
             this.audio.sfx('pop');
             this.particles.burst(ent.x, ent.y, '#ffd27f', 14, 110);
+            this.floaters.add(ent.x, ent.y, sc, '#ffd27f');
           }
           break;
         }

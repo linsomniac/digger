@@ -115,6 +115,8 @@ function drawEntities(ctx, game) {
   }
   // particles
   game.particles.draw(ctx);
+  // floating score popups (on top, so they stay readable)
+  game.floaters.draw(ctx);
 }
 
 function drawHUD(ctx, game) {
