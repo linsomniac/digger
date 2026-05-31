@@ -196,7 +196,7 @@ export class Game {
       this.audio.setMoving(false);
     }
 
-    this.pump.update(dt, this.grid, this.player, this.enemies.enemies, pumpHeld, events);
+    this.pump.update(dt, this.grid, this.player, this.enemies.enemies, events);
     this.enemies.update(dt, this.grid, this.player, this.level, this.rng, events);
 
     const crushables = [this.player, ...this.enemies.enemies.filter((e) => e.state !== 'dead')];

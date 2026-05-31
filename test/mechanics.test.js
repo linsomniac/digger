@@ -3,10 +3,10 @@
 // player runs away.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Grid, tileToPx } from '../src/grid.js';
+import { Grid, tileToPx, pxToTile } from '../src/grid.js';
 import { RockField } from '../src/rocks.js';
 import { Enemy } from '../src/enemies.js';
-import { ROCK_WOBBLE_SEC, INFLATE_RELEASE_SEC, Dir } from '../src/constants.js';
+import { ROCK_WOBBLE_SEC, INFLATE_RELEASE_SEC, PLAYER_SPEED, Dir } from '../src/constants.js';
 
 const STEP = 1 / 60;
 
@@ -53,6 +53,39 @@ test('restingCells lists suspended rocks so the player is blocked', () => {
   const rf = new RockField([[3, 3]]);
   const cells = rf.restingCells();
   assert.ok(cells.has('3,3'), 'a resting rock blocks its cell');
+});
+
+test('a player walking horizontally under a rock clears it before it drops', () => {
+  // Player tunnel along row 3, but (5,3) starts as soil so walking into it both
+  // digs it AND undermines the rock at (5,2) directly above — the exact case the
+  // player reported being squished in. The fuse must outlast the walk-through.
+  const g = new Grid(12, 6);
+  for (let c = 0; c < 12; c++) if (c !== 5) g.setSolid(c, 3, false);
+  const rf = new RockField([[5, 2]]);
+
+  const start = tileToPx(1, 3);
+  const player = { x: start.x, y: start.y, alive: true };
+  const STEP = 1 / 60;
+  let undermined = false;
+  let crushed = false;
+
+  for (let i = 0; i < 1200; i++) {
+    player.x += PLAYER_SPEED * STEP;
+    const c = pxToTile(player.x, player.y).c;
+    // Mimic stepEntity digging the cell ahead: as the player reaches col 4 they
+    // carve (5,3), undermining the rock (conservative — earlier than real play).
+    if (!undermined && c >= 4) {
+      g.setSolid(5, 3, false);
+      undermined = true;
+    }
+    for (const ev of rf.update(STEP, g, [player], player, false)) {
+      if (ev.type === 'crush' && ev.entity === player) crushed = true;
+    }
+    if (player.x > tileToPx(11, 3).x) break;
+  }
+
+  assert.equal(undermined, true, 'sanity: the rock was undermined mid-walk');
+  assert.equal(crushed, false, 'a moving player is not squished walking under it');
 });
 
 test('a released, still-inflated enemy stays frozen then deflates to normal', () => {

@@ -1,12 +1,13 @@
-// AIDEV-NOTE: The harpoon/pump. Hooks an enemy in front of the player, inflates it
-// on each pump (auto-inflates while held, snappier on taps), deflates if you stop,
-// and pops it at MAX_INFLATE. Emits events; game.js applies scoring + particles.
+// AIDEV-NOTE: The harpoon/pump. Hooks an enemy in front of the player and inflates
+// it ONE stage per discrete button press — NO auto-repeat while held. Holding the
+// button does nothing after the initial stab; you must tap again to pump again.
+// Stop tapping and the enemy slowly deflates one stage at a time and is released;
+// reaching MAX_INFLATE pops it. Emits events; game.js applies scoring + particles.
 import {
   PUMP_REACH,
   MAX_INFLATE,
   INFLATE_DEFLATE_SEC,
   PUMP_EXTEND_SEC,
-  PUMP_INFLATE_COOLDOWN,
   TILE,
   DIR_VEC,
   Dir,
@@ -24,7 +25,6 @@ export class Pump {
     this.len = 0;
     this.maxLen = PUMP_REACH;
     this.hooked = null;
-    this.autoT = 0;
     this.sincePump = 0;
   }
 
@@ -39,14 +39,13 @@ export class Pump {
     this.dir = player.facing || Dir.RIGHT;
     this.len = 0;
     this.hooked = null;
-    this.autoT = 0;
     this.sincePump = 0;
     const cell = pxToTile(player.x, player.y);
     const [dx, dy] = DIR_VEC[this.dir];
     this.maxLen = grid.isTunnel(cell.c + dx, cell.r + dy) ? PUMP_REACH : TILE * 0.45;
   }
 
-  // A discrete pump tap — inflates immediately when already hooked.
+  // A discrete pump tap — inflates one stage when already hooked.
   pumpPress(grid, events) {
     if (this.active && this.hooked) this._inflate(grid, events);
   }
@@ -69,7 +68,6 @@ export class Pump {
     e.inflate += 1;
     e.deflateT = 0; // fresh pump resets the release countdown
     this.sincePump = 0;
-    this.autoT = 0;
     events.push({ type: 'inflate', enemy: e });
     if (e.inflate >= MAX_INFLATE) {
       const r = pxToTile(e.x, e.y).r;
@@ -101,7 +99,7 @@ export class Pump {
     return null;
   }
 
-  update(dt, grid, player, enemies, pumpHeld, events) {
+  update(dt, grid, player, enemies, events) {
     if (!this.active) return;
 
     // Extend the harpoon.
@@ -112,40 +110,36 @@ export class Pump {
       if (e) {
         this.hooked = e;
         e.state = 'hooked';
-        e.inflate = Math.max(1, e.inflate);
+        e.inflate = Math.max(1, e.inflate); // the stab itself is the first pump
         e.deflateT = 0;
         this.sincePump = 0;
-        this.autoT = 0;
         events.push({ type: 'hook', enemy: e });
-      } else if (!pumpHeld && this.len >= this.maxLen) {
-        // Missed stab, button released -> retract.
+      } else if (this.len >= this.maxLen) {
+        // Missed stab, fully extended -> retract.
         this.cancel();
-        return;
       }
+      return;
     }
 
-    if (this.hooked) {
-      const e = this.hooked;
-      // Lock harpoon onto the enemy.
-      const [dx, dy] = DIR_VEC[this.dir];
-      this.len = Math.abs(dx) * Math.abs(e.x - player.x) + Math.abs(dy) * Math.abs(e.y - player.y);
+    // Hooked: lock the harpoon onto the enemy.
+    const e = this.hooked;
+    const [dx, dy] = DIR_VEC[this.dir];
+    this.len = Math.abs(dx) * Math.abs(e.x - player.x) + Math.abs(dy) * Math.abs(e.y - player.y);
 
-      if (pumpHeld) {
-        this.autoT += dt;
-        if (this.autoT >= PUMP_INFLATE_COOLDOWN) this._inflate(grid, events);
-      } else {
-        this.sincePump += dt;
-        if (this.sincePump >= INFLATE_DEFLATE_SEC) {
-          this.sincePump = 0;
-          e.inflate -= 1;
-          if (e.inflate <= 0) {
-            e.inflate = 0;
-            e.state = 'normal';
-            this.active = false;
-            this.hooked = null;
-            this.len = 0;
-          }
-        }
+    // No auto-pump: inflation happens ONLY on discrete presses (pumpPress). If the
+    // player stops tapping, the enemy slowly deflates one stage at a time; at zero
+    // the harpoon retracts and the enemy is freed.
+    this.sincePump += dt;
+    if (this.sincePump >= INFLATE_DEFLATE_SEC) {
+      this.sincePump = 0;
+      e.inflate -= 1;
+      if (e.inflate <= 0) {
+        e.inflate = 0;
+        e.state = 'normal';
+        e.deflateT = 0;
+        this.active = false;
+        this.hooked = null;
+        this.len = 0;
       }
     }
   }
