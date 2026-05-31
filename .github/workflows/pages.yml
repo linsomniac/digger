@@ -1,0 +1,53 @@
+# AIDEV-NOTE: Deploys the static game to GitHub Pages on every push to main/master.
+# The game needs no build step — it is plain ES modules + HTML — so we upload the
+# repo root as the Pages artifact. index.html references assets with relative paths
+# (src/...), so it works correctly under the project subpath (user.github.io/digger/).
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master] # whichever your default branch is
+  workflow_dispatch: # allow manual runs from the Actions tab
+
+# Allow the workflow to publish Pages, and read the repo.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One concurrent deployment; let an in-progress run finish rather than cancelling.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run tests (node --test, zero deps)
+        run: node --test
+
+  deploy:
+    name: Build & deploy
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Whole repo root is the site; docs/ and test/ ride along harmlessly.
+          path: .
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

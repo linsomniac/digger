@@ -6,7 +6,18 @@ pop, and drop rocks to crush them. Clear every monster to advance to the next ro
 
 ![Digger](docs/superpowers/specs/2026-05-30-digger-dig-dug-game-design.md)
 
-## Play
+## Play online
+
+Pushing to `main`/`master` auto-publishes the game to **GitHub Pages** via the
+workflow in `.github/workflows/pages.yml` (it runs the unit tests first, then
+deploys). To enable it on a fresh repo:
+
+1. Push this repo to GitHub.
+2. In the repo: **Settings → Pages → Build and deployment → Source → "GitHub Actions"**.
+3. Push to `main`/`master` (or run the workflow manually from the **Actions** tab).
+   The site appears at `https://<user>.github.io/<repo>/`.
+
+## Play locally
 
 Because browsers block ES-module imports over `file://`, run it from a tiny static server:
 
