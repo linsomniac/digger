@@ -1,0 +1,6 @@
+# OS / editor
+.DS_Store
+*.swp
+
+# Node (only used for tests)
+node_modules/
