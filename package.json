@@ -1,0 +1,11 @@
+{
+  "name": "digger",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A faithful, backend-free browser throwback to Dig Dug.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "serve": "python3 -m http.server 8000"
+  }
+}

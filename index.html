@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0e0a16" />
+<title>Digger — a Dig Dug throwback</title>
+<style>
+  :root {
+    --bg: #0b0712;
+    --panel: #160f24;
+    --glow: #ffd27f;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; background: var(--bg);
+    color: #f4ead6;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    overflow: hidden; touch-action: none; overscroll-behavior: none;
+  }
+  #stage {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background:
+      radial-gradient(120% 120% at 50% 0%, #20153a 0%, #0b0712 70%);
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  #frame {
+    position: relative;
+    border-radius: 14px;
+    padding: 12px;
+    background: linear-gradient(180deg, #2a1d45, #160f24);
+    box-shadow: 0 0 0 2px #3a2a5e, 0 20px 60px rgba(0,0,0,.6), inset 0 0 40px rgba(255,210,127,.05);
+  }
+  canvas#game {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    border-radius: 8px;
+    background: #0e0a16;
+    box-shadow: 0 0 0 2px #0a0712, 0 0 24px rgba(255,210,127,.08) inset;
+    touch-action: none;
+  }
+
+  /* On-screen controls (touch). Hidden until a touch is detected. */
+  #touch {
+    position: fixed; inset: 0; pointer-events: none; display: none;
+    z-index: 5;
+  }
+  body.touch #touch { display: block; }
+  .pad {
+    position: absolute; bottom: max(18px, env(safe-area-inset-bottom)); pointer-events: auto;
+    user-select: none;
+  }
+  #dpad { left: 18px; width: 168px; height: 168px; }
+  #dpad button {
+    position: absolute; width: 56px; height: 56px; border: none; border-radius: 12px;
+    background: rgba(255,255,255,.10); color: #ffe6b0; font-size: 22px; line-height: 56px;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.12); backdrop-filter: blur(2px);
+  }
+  #dpad button:active { background: rgba(255,210,127,.35); }
+  .b-up    { left: 56px; top: 0; }
+  .b-left  { left: 0;   top: 56px; }
+  .b-right { left: 112px; top: 56px; }
+  .b-down  { left: 56px; top: 112px; }
+  #pump {
+    right: 22px; width: 96px; height: 96px; border-radius: 50%;
+    border: none; color: #2a160a; font-weight: 800; font-size: 16px; letter-spacing: .5px;
+    background: radial-gradient(circle at 35% 30%, #ffe7a8, #ff9d3c);
+    box-shadow: 0 8px 18px rgba(0,0,0,.5), inset 0 0 0 3px rgba(255,255,255,.25);
+  }
+  #pump:active { transform: translateY(2px); filter: brightness(1.1); }
+
+  .topbtn {
+    position: fixed; top: max(12px, env(safe-area-inset-top)); pointer-events: auto;
+    width: 44px; height: 44px; border: none; border-radius: 10px; z-index: 6;
+    background: rgba(255,255,255,.10); color: #ffe6b0; font-size: 20px;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.12);
+  }
+  #btnMute { right: 14px; }
+  #btnPause { right: 66px; }
+  .topbtn:active { background: rgba(255,210,127,.3); }
+
+  #hint {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: max(8px, env(safe-area-inset-bottom)); font-size: 11px; opacity: .45;
+    z-index: 4; pointer-events: none; white-space: nowrap;
+  }
+  body.touch #hint { display: none; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="frame">
+      <canvas id="game" width="512" height="416" aria-label="Digger game"></canvas>
+    </div>
+  </div>
+
+  <button id="btnPause" class="topbtn" aria-label="Pause">⏸</button>
+  <button id="btnMute" class="topbtn" aria-label="Mute">🔊</button>
+
+  <div id="touch" aria-hidden="true">
+    <div id="dpad" class="pad">
+      <button class="b-up"    data-dir="up"    aria-label="Up">▲</button>
+      <button class="b-left"  data-dir="left"  aria-label="Left">◀</button>
+      <button class="b-right" data-dir="right" aria-label="Right">▶</button>
+      <button class="b-down"  data-dir="down"  aria-label="Down">▼</button>
+    </div>
+    <button id="pump" class="pad" aria-label="Pump">PUMP</button>
+  </div>
+
+  <div id="hint">Arrows/WASD to dig · Space to pump · P pause · M mute</div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
