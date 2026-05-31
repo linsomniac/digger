@@ -13,8 +13,11 @@ export const CANVAS_H = HUD_H + PLAYFIELD_H; // 416
 export const LAYER_ROWS = 3; // rows per soil layer
 export const NUM_LAYERS = 4; // ROWS / LAYER_ROWS
 // Top (sky-lit sand) -> deep. Cute, warm, readable palette.
-export const LAYER_COLORS = ['#e6b06b', '#cf7f3c', '#a85236', '#46568a'];
-export const LAYER_COLORS_DARK = ['#c9914f', '#b06a2c', '#8c3f28', '#36436d'];
+// Frozen: these are imported read-only by render.js and returned by getLevel()
+// (as level.layerColors). Freezing turns any accidental future mutation into an
+// immediate error rather than silently corrupting every level's palette.
+export const LAYER_COLORS = Object.freeze(['#e6b06b', '#cf7f3c', '#a85236', '#46568a']);
+export const LAYER_COLORS_DARK = Object.freeze(['#c9914f', '#b06a2c', '#8c3f28', '#36436d']);
 export const TUNNEL_COLOR = '#221812';
 export const TUNNEL_EDGE = '#3a2a1d';
 export const BG_COLOR = '#0e0a16';

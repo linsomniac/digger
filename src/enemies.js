@@ -1,5 +1,6 @@
 // AIDEV-NOTE: Pooka + Fygar. Tunnel-chase via ai.chooseTunnelDir, periodic ghost
-// mode (drift through soil), Fygar horizontal fire, and last-enemy flee. Frozen
+// mode (drift through soil), Fygar horizontal fire (blocked by soil — stops at the
+// first not-fully-dug block, see _fireReach), and last-enemy flee. Frozen
 // while hooked (pump.js drives that). After the player runs away, a still-inflated
 // enemy stays frozen and slowly deflates back to normal over a few seconds, then
 // resumes. Ghosts and inflated enemies are non-lethal (fair).
@@ -23,7 +24,7 @@ function distTiles(a, b) {
 }
 
 export class Enemy {
-  constructor(type, c, r, speed, ghostPhase = 0) {
+  constructor(type, c, r, speed, ghostPhase = 0, startDelay = 0) {
     const p = tileToPx(c, r);
     this.type = type; // 'pooka' | 'fygar'
     this.x = p.x;
@@ -36,6 +37,8 @@ export class Enemy {
     this.inflate = 0;
     this.deflateT = 0; // release-deflation timer (after the player runs away)
     this.escaped = false;
+    this.startDelay = startDelay; // brief wake-up hold so the pack doesn't lurch in lockstep
+    this.bornT = 0; // time alive this round (resets on respawn) — gates the wake-up hold
     this.ghostTimer = ghostPhase;
     this.ghostElapsed = 0;
     this.fireTimer = 0;
@@ -56,6 +59,7 @@ export class Enemy {
     this.inflate = 0;
     this.deflateT = 0;
     this.escaped = false;
+    this.bornT = 0; // re-stagger the wake-up hold on respawn too
     this.ghostElapsed = 0;
     this.fireState = 'none';
     this.fireT = 0;
@@ -70,13 +74,30 @@ export class Enemy {
     return this.state === 'normal' || this.state === 'fleeing';
   }
 
+  // AIDEV-NOTE: Fire line-of-sight. How far the breath can travel before hitting
+  // soil, in pixels, capped at FIRE_RANGE_TILES. Fygar fire does NOT pass through
+  // dirt — it stops at the first not-fully-dug block. Used both to decide whether
+  // to breathe (clear shot only) and to clamp the live flame length each frame.
+  _fireReach(grid, dir) {
+    const cell = pxToTile(this.x, this.y);
+    const sign = dir === Dir.LEFT ? -1 : 1;
+    let tiles = 0;
+    for (let i = 1; i <= FIRE_RANGE_TILES; i++) {
+      if (!grid.isTunnel(cell.c + sign * i, cell.r)) break; // soil blocks the breath
+      tiles++;
+    }
+    return tiles * TILE;
+  }
+
   _maybeFire(grid, player, level) {
     if (this.type !== 'fygar' || this.fireState !== 'none') return false;
     if (this.fireTimer < level.fireInterval) return false;
     if (Math.abs(this.y - player.y) > TILE * 0.5) return false;
     const dir = player.x < this.x ? Dir.LEFT : Dir.RIGHT;
     const rel = (player.x - this.x) * (dir === Dir.RIGHT ? 1 : -1);
-    if (rel <= 0 || rel > FIRE_RANGE_TILES * TILE + TILE) return false;
+    // Only breathe when there is a clear line of tunnel to the player — never
+    // through soil.
+    if (rel <= 0 || rel > this._fireReach(grid, dir)) return false;
     this.fireState = 'telegraph';
     this.fireT = 0;
     this.fireDir = dir;
@@ -84,7 +105,7 @@ export class Enemy {
     return true;
   }
 
-  _updateFire(dt, events) {
+  _updateFire(dt, grid, events) {
     if (this.fireState === 'telegraph') {
       this.fireT += dt;
       if (this.fireT >= FIRE_TELEGRAPH_SEC) {
@@ -95,7 +116,15 @@ export class Enemy {
       }
     } else if (this.fireState === 'active') {
       this.fireT += dt;
-      this.fireLen = Math.min(FIRE_RANGE_TILES * TILE, this.fireLen + (FIRE_RANGE_TILES * TILE / 0.25) * dt);
+      // Grow the flame, but never past the first solid block in its path. Reach is
+      // recomputed each frame: if the player digs the wall away the flame extends;
+      // soil left undug keeps it short. The hitbox + render both read fireLen, so
+      // clamping here makes them all stop at the wall together.
+      this.fireLen = Math.min(
+        FIRE_RANGE_TILES * TILE,
+        this.fireLen + (FIRE_RANGE_TILES * TILE / 0.25) * dt,
+        this._fireReach(grid, this.fireDir),
+      );
       if (this.fireT >= FIRE_DURATION_SEC) {
         this.fireState = 'none';
         this.fireTimer = 0;
@@ -122,11 +151,19 @@ export class Enemy {
       return;
     }
 
+    // Wake-up stagger: hold still for a beat at round start (and on respawn) so the
+    // monsters don't all start moving on the same frame in the same direction.
+    if (this.bornT < this.startDelay) {
+      this.bornT += dt;
+      this.dir = Dir.NONE;
+      return;
+    }
+
     if (this.type === 'fygar') this.fireTimer += dt;
 
     // Fire takes over movement while telegraphing/breathing.
     if (this.fireState !== 'none') {
-      this._updateFire(dt, events);
+      this._updateFire(dt, grid, events);
       return;
     }
 
@@ -190,7 +227,11 @@ export class Enemy {
 
 export class EnemyField {
   constructor(defs = [], speed = 60) {
-    this.enemies = defs.map((d, i) => new Enemy(d.type, d.c, d.r, speed, (i % 4) * 1.3));
+    // Spread the wake-up delays (0..~0.5s) across the pack so they don't lurch into
+    // motion in lockstep; the * 0.37 % 0.6 just scatters them rather than ramping.
+    this.enemies = defs.map(
+      (d, i) => new Enemy(d.type, d.c, d.r, speed, (i % 4) * 1.3, (i * 0.37) % 0.6),
+    );
     this.aloneT = 0;
   }
 
